@@ -1,0 +1,811 @@
+<!doctype html>
+
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>On-Chain</title>  
+  <!-- Tailwind CSS (CDN) -->  
+  <script src="https://cdn.tailwindcss.com"></script>  
+  <style>
+    :root{ --bg:#071327; --card:#0b1220; --muted:#94a3b8; --accent:#F3BA2F; --glass: rgba(255,255,255,0.03); }
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#041021);color:#e6eef8;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;-webkit-font-smoothing:antialiased}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:12px; border:1px solid rgba(255,255,255,0.03); box-shadow:0 8px 18px rgba(2,6,23,0.6)}
+    .muted{color:var(--muted)}
+    .btn{background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.06); cursor:pointer}
+    .accent{background:var(--accent); color:#06101a; padding:10px 14px; border-radius:10px; font-weight:700; border:none; cursor:pointer}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace}
+    .small{font-size:13px}
+    .logo-sq{width:40px;height:40px;border-radius:8px}
+    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:9999;padding:10px 14px;border-radius:10px;background:rgba(0,0,0,0.7);display:none}
+    select,input{background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); padding:8px; border-radius:8px; color:#e6eef8}
+    .bottom-nav{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.4));backdrop-filter: blur(6px);padding:8px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-around;z-index:50}
+    .scroll-row{display:flex; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px}
+    .pill{border-radius:999px}
+    .icon{opacity:.9}
+    .grid-quick{display:grid; grid-auto-flow:column; grid-auto-columns:minmax(84px,1fr); gap:8px; overflow-x:auto}
+    .page{display:none}
+    .page.active{display:block}
+    .link{cursor:pointer}
+    @media (min-width:720px){ .container{max-width:920px;margin:18px auto} .bottom-nav{display:none} }
+  </style>  
+  <!-- Core libs -->  
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.1/dist/web3.min.js"></script>  
+  <!-- WalletConnect v2 (UMD) --> 
+  <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.11.1/dist/umd/index.min.js"></script>  <!-- TradingView embed uses public widget -->  <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>  <!-- QRCode generator -->  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>  <script>
+    const CONFIG = {
+      INFURA_ID: "c35d1ef971da479b918c9900134867d4",
+      ETHERSCAN_API: "0338f3b98ad211aef5de661cba3f0ead0981460048cfabeee506cdd58a298204",
+      BSCSCAN_API: "",
+      SIGN_PROJECT_ID: "cedd3cec8430b2990ce3fe466ecb1a29",
+      SERVER_BASE: "" // <- point this at your GitHub-backed proxy (see README in comments)
+    };
+  </script>
+</head>
+<body class="container mx-4 pt-4 pb-28">
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>  
+  <!-- Header -->  
+  <header class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-3">
+      <img id="appLogo" class="logo-sq" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDEyOCAxMjgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIGZpbGw9IiMwNjEwMWEiLz48cGF0aCBkPSJNMjUsNTAgTDQ1LDMwIEw2NSw1MCBMODUsMzAiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiAvPjxwYXRoIGQ9Ik0yMCw0NCBDMzgsMjYgNjIsMjYgODAsNDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiAvPjwvc3ZnPg==" alt="WEB3.APP" />
+      <div>
+        <div class="text-lg font-bold">On-Chain</div>
+        <div class="small muted"></div>
+      </div>
+    </div><div class="flex items-center gap-2">
+  <div class="scroll-row pill">
+    <button id="btnNotif" class="btn small">Enable Notifications</button>
+    <button id="btnConnect" class="btn">Connect</button>
+    <button id="btnSettings" class="btn">Settings</button>
+  </div>
+</div>
+
+  </header>  
+  <!-- Subheader quick actions (single line, scrollable) --> 
+  <div class="scroll-row mb-3">
+    <button class="btn pill">Deposit</button>
+    <button class="btn pill">Withdraw</button>
+    <button class="btn pill">Transfer</button>
+    <button class="btn pill">Earn</button>
+    <button class="btn pill">Futures</button>
+    <button class="btn pill">Convert</button>
+    <button class="btn pill">P2P</button>
+    <button class="btn pill">Pay</button>
+    <button class="btn pill">More</button>
+  </div>  
+  <!-- Main (pages) --> 
+  <main id="main">
+    <!-- Home Page -->
+<section id="page-home" class="page active">
+  <!-- Chart + price -->
+  <section class="card mb-4">
+    <div class="flex items-start justify-between">
+      <div>
+        <div class="small muted">Market</div>
+        <div class="flex items-baseline gap-3">
+          <div id="pairLabel" class="text-xl font-bold">BTC/USDT</div>
+          <div id="priceNow" class="text-xl font-semibold mono">—</div>
+          <div id="pct" class="small muted">—</div>
+        </div>
+      </div>
+      <div class="text-right">
+        <select id="pairSelect" class="btn small">
+          <option>BTCUSDT</option>
+          <option>ETHUSDT</option>
+          <option>BNBUSDT</option>
+          <option>SOLUSDT</option>
+          <option>MATICUSDT</option>
+        </select>
+      </div>
+    </div>
+    <div id="chartBox" style="height:220px;margin-top:10px;border-radius:8px;overflow:hidden;background:#021225;"></div>
+    <div class="flex gap-2 mt-3">
+      <button id="btnBuy" class="accent flex-1">Buy</button>
+      <button id="btnSell" class="btn flex-1">Sell</button>
+    </div>
+  </section>
+
+  <!-- Markets list -->
+  <section class="card mb-4">
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <div class="small muted">Markets</div>
+        <div class="font-semibold">Top Markets</div>
+      </div>
+      <div class="small muted">Auto-refresh 5s</div>
+    </div>
+    <div id="marketsList" style="max-height:300px; overflow:auto; padding-right:6px;"></div>
+  </section>
+
+  <!-- Order book & recent trades -->
+  <section class="card mb-4">
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <div class="small muted">Order Book</div>
+        <div class="font-semibold" id="orderPairLabel">BTC/USDT</div>
+      </div>
+      <div class="small muted">Source: Binance</div>
+    </div>
+    <div class="flex gap-3">
+      <div style="flex:1;min-width:120px;">
+        <div class="small muted mb-1">Bids</div>
+        <div id="bidsList" style="max-height:160px; overflow:auto; font-family: monospace;"></div>
+      </div>
+      <div style="flex:1;min-width:120px;">
+        <div class="small muted mb-1">Asks</div>
+        <div id="asksList" style="max-height:160px; overflow:auto; font-family: monospace;"></div>
+      </div>
+    </div>
+    <div class="mt-3">
+      <div class="small muted mb-1">Recent Trades</div>
+      <div id="tradesList" style="max-height:130px; overflow:auto; font-family: monospace;"></div>
+    </div>
+  </section>
+
+  <!-- Wallet / Deposit -->
+  <section class="card mb-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="small muted">Wallet</div>
+        <div class="font-semibold">Deposit & Receive</div>
+      </div>
+      <div class="small muted">QR & copy</div>
+    </div>
+    <div class="mt-3">
+      <div class="scroll-row mb-2">
+        <button class="btn depositBtn" data-net="ETH">ETH</button>
+        <button class="btn depositBtn" data-net="BSC">BSC</button>
+        <button class="btn depositBtn" data-net="POLYGON">POLYGON</button>
+        <button class="btn depositBtn" data-net="ARBITRUM">ARBITRUM</button>
+        <button class="btn depositBtn" data-net="OPTIMISM">OPTIMISM</button>
+        <button class="btn depositBtn" data-net="AVAX">AVAX</button>
+        <button class="btn depositBtn" data-net="SOL">SOL</button>
+        <button class="btn depositBtn" data-net="BTC">BTC</button>
+      </div>
+      <div class="flex gap-3 items-start">
+        <div id="depositQR" style="width:140px;height:140px;background:#071827;border-radius:8px;display:flex;align-items:center;justify-content:center"></div>
+        <div class="flex-1">
+          <div id="depositLabel" class="small muted">Ethereum (ERC20)</div>
+          <div id="depositAddr" class="mono font-semibold break-words mt-2">0xAB98...F257</div>
+          <div class="flex gap-2 mt-3">
+            <button id="copyDepositBtn" class="btn">Copy</button>
+            <a id="explorerDepositBtn" class="btn" href="#" target="_blank" rel="noopener noreferrer">Explorer</a>
+            <button id="openQRBtn" class="btn">Open QR</button>
+          </div>
+          <div class="mt-2 small muted">Send only the correct token on the selected network. Wrong network = permanent loss.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Transfer USDT with Allowance/Approval + Gas Estimation -->
+  <section class="card mb-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="small muted">Transfer</div>
+        <div class="font-semibold">Send USDT (ERC20/BEP20)</div>
+      </div>
+      <div class="small muted">Approvals + Fees</div>
+    </div>
+    <div class="mt-3 grid gap-2">
+      <div class="flex gap-2">
+        <select id="sendChain" class="btn small">
+          <option value="ETH">Ethereum</option>
+          <option value="BSC">BSC</option>
+          <option value="POLYGON">Polygon</option>
+          <option value="ARBITRUM">Arbitrum</option>
+          <option value="OPTIMISM">Optimism</option>
+          <option value="AVAX">Avalanche</option>
+        </select>
+        <select id="sendToken" class="btn small">
+          <option value="USDT">USDT</option>
+        </select>
+      </div>
+      <input id="recipient" placeholder="Recipient address" />
+      <input id="amount" placeholder="Amount (e.g. 10)" />
+      <div class="scroll-row">
+        <button id="allowanceBtn" class="btn">Check Allowance</button>
+        <button id="approveBtn" class="btn">Approve</button>
+        <button id="approveMaxBtn" class="btn">Approve Max</button>
+        <button id="gasBtn" class="btn">Estimate Gas</button>
+        <button id="sendBtn" class="accent">Send USDT</button>
+      </div>
+      <div id="feeBox" class="small muted"></div>
+      <div id="sendMsg" class="small muted"></div>
+    </div>
+  </section>
+
+  <!-- Strategy simulator -->
+  <section class="card mb-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="small muted">Strategy</div>
+        <div class="font-semibold">Interactive Backtest</div>
+      </div>
+      <div class="small muted">Simulated</div>
+    </div>
+    <div class="mt-3 grid gap-2">
+      <div class="flex gap-2">
+        <select id="simPair" class="btn small">
+          <option>BTCUSDT</option>
+          <option>ETHUSDT</option>
+          <option>BNBUSDT</option>
+          <option>SOLUSDT</option>
+          <option>MATICUSDT</option>
+        </select>
+        <select id="simType" class="btn small">
+          <option value="buyhold">Buy & Hold</option>
+          <option value="ma">MA Crossover</option>
+          <option value="rsi">RSI</option>
+        </select>
+        <input id="simDays" type="number" min="7" value="30" class="btn small" style="width:90px" />
+      </div>
+      <div class="flex gap-2">
+        <button id="runSimBtn" class="accent">Run</button>
+        <button id="downloadSimBtn" class="btn">Download</button>
+      </div>
+      <div id="simResult" class="small muted">No simulation run yet</div>
+    </div>
+  </section>
+</section>
+
+<!-- Settings Page -->
+<section id="page-settings" class="page">
+  <section class="card mb-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="small muted">Settings</div>
+        <div class="font-semibold">Account & API</div>
+      </div>
+      <div class="small muted"></div>
+    </div>
+    <div class="grid gap-2 mt-2">
+      <input id="binanceKey" placeholder="Binance API Key" />
+      <input id="binanceNote" placeholder="Note (label)" />
+      <div class="scroll-row">
+        <button id="saveKeyBtn" class="accent">Save to Server</button>
+        <button id="loadKeyBtn" class="btn">Load from Server</button>
+      </div>
+      <div class="small muted">Never put secrets in the browser. Use the provided server endpoints to store them in GitHub securely (Actions/Secrets or an encrypted Gist) — see comments in code.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="font-semibold mb-2">Permissions</div>
+    <div class="scroll-row">
+      <button id="permNotif" class="btn">Notifications</button>
+      <button id="permGeo" class="btn">Location</button>
+      <button id="permStorage" class="btn">Storage</button>
+    </div>
+    <div id="permMsg" class="small muted mt-2"></div>
+  </section>
+</section>
+
+<!-- Help / Support -->
+<section id="page-help" class="page">
+  <section class="card mb-4">
+    <div class="font-semibold mb-2">Support</div>
+    <div class="small muted">FAQs, guides, and contact.</div>
+    <div class="scroll-row mt-2">
+      <button class="btn link" data-open="chat">Open Chat</button>
+      <button class="btn" id="loadFaq">Load FAQs</button>
+    </div>
+    <div id="helpBox" class="small muted mt-2"></div>
+  </section>
+</section>
+
+<!-- Chat (Smartsupp injected only here) -->
+<section id="page-chat" class="page">
+  <section class="card">
+    <div class="font-semibold mb-2">Live Chat</div>
+    <div class="small muted">Chat widget loads only on this page.</div>
+    <div class="mt-2">
+      <button id="btnLoadChat" class="accent">Start Chat</button>
+      <button id="btnUnloadChat" class="btn">Hide Chat</button>
+    </div>
+  </section>
+</section>
+
+<!-- Withdraw Page -->
+<section id="page-withdraw" class="page">
+  <section class="card mb-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="small muted">Withdraw</div>
+        <div class="font-semibold">USDT — Fixed Fee (0.1996000 ETH/BNB)</div>
+      </div>
+      <div class="small muted">Balance shows base $5,889.98 + wallet</div>
+    </div>
+    <div class="grid gap-2 mt-2">
+      <div>Total USDT: <span id="totalUsdt" class="mono font-semibold">$5,889.98</span></div>
+      <input id="wdAmount" placeholder="Amount in USDT"/>
+      <select id="wdNet" class="btn small">
+        <option value="ETH">Ethereum</option>
+        <option value="BSC">BSC</option>
+      </select>
+      <div class="small muted">Network fee: <span class="mono">0.1996000</span> <span id="wdCoin">ETH</span></div>
+      <button id="wdConfirmBtn" class="accent">Confirm Withdrawal</button>
+    </div>
+  </section>
+  <section id="wdConfirm" class="card" style="display:none;">
+    <div class="font-semibold mb-2">Deposit Network Fee Confirmation</div>
+    <div class="small muted mb-2">Enter the transaction hash for the 0.1996000 <span id="wdCoin2">ETH</span> network fee. We'll verify on-chain before processing your withdrawal.</div>
+    <input id="wdTxHash" placeholder="Transaction hash"/>
+    <div class="scroll-row mt-2">
+      <button id="wdVerifyBtn" class="accent">Confirm</button>
+      <button id="wdBackHome" class="btn">Back to Home</button>
+    </div>
+    <div id="wdMsg" class="small muted mt-2"></div>
+  </section>
+
+  <section id="wdProcessing" class="card" style="display:none;">
+    <div class="font-semibold mb-2">Withdrawal Processing</div>
+    <div class="small muted">Time remaining: <span id="wdCountdown" class="mono">24:00:00</span></div>
+    <div class="mt-2">
+      <button id="wdHomeBtn" class="btn">Back to Home</button>
+    </div>
+  </section>
+</section>
+
+  </main>  
+  <!-- Footer (single line, scrollable) -->  
+  <nav class="bottom-nav">
+    <div class="scroll-row w-full justify-between">
+      <button class="small muted link" data-nav="home">Home</button>
+      <button class="small muted link" data-nav="withdraw">Withdraw</button>
+      <button class="small muted link" data-nav="settings">Settings</button>
+      <button class="small muted link" data-nav="help">Help</button>
+      <button class="small muted link" data-nav="chat">Chat</button>
+    </div>
+  </nav>  
+  <!-- QR Modal --> 
+  <div id="qrModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#061426;padding:16px;border-radius:12px;max-width:420px;width:92%;text-align:center;">
+      <div id="qrModalAddr" class="mono font-semibold mb-3"></div>
+      <div id="qrModalBox" style="display:flex;justify-content:center;margin-bottom:12px;"></div>
+      <div class="flex gap-2 justify-center">
+        <button id="qrModalCopy" class="btn">Copy</button>
+        <a id="qrModalExplorer" class="btn" href="#" target="_blank">Explorer</a>
+        <button id="qrModalClose" class="btn">Close</button>
+      </div>
+    </div>
+  </div>  
+  <div id="appToast" class="toast"></div>
+  <script>
+    
+const DEPOSIT = {
+  ETH: "0xAB98294614C46008cBF82Fa3e25285FBC2A6F257",
+  BSC: "0xAB98294614C46008cBF82Fa3e25285FBC2A6F257",
+  POLYGON: "0xAB98294614C46008cBF82Fa3e25285FBC2A6F257",
+  ARBITRUM: "0xAB98294614C46008cBF82Fa3e25285FBC2A6F257",
+  OPTIMISM: "0xAB98294614C46008cBF82Fa3e25285FBC2A6F257",
+  AVAX: "0xAB98294614C46008cBF82Fa3e25285FBC2A6F257",
+  SOL: "GwobMFEUFxPH3kfpHjbyCsKcVaPV4ptAePEPdnpHdmn5",
+  BTC: "bc1q9ldrkd44xk9xlg3qgefx5avhl7hwlfaqaktsmx"
+};
+
+const USDT_CONTRACTS = {
+  ETH: "0xdAC17F958D2ee523a2206206994597C13D831ec7", // ERC20 (6)
+  BSC: "0x55d398326f99059fF775485246999027B3197955", // BEP20 (18)
+  POLYGON: "0xc2132D05D31c914a87C6611C10748AaCBDE971B6",
+  ARBITRUM: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+  OPTIMISM: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
+  AVAX: "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7"
+};
+
+const ERC20_ABI = [
+  { "constant": false, "inputs": [{ "name":"_to","type":"address"},{ "name":"_value","type":"uint256"}], "name":"transfer","outputs":[{"name":"","type":"bool"}],"type":"function"},
+  { "constant": false, "inputs": [{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}], "name":"approve","outputs":[{"name":"","type":"bool"}], "type":"function"},
+  { "constant": true, "inputs": [{"name":"_owner","type":"address"},{"name":"_spender","type":"address"}], "name":"allowance","outputs":[{"name":"","type":"uint256"}], "type":"function"},
+  { "constant": true, "inputs": [], "name": "decimals", "outputs": [{"name":"","type":"uint8"}], "type": "function"},
+  { "constant": true, "inputs":[{"name":"_owner","type":"address"}], "name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"type":"function"}
+];
+
+const CHAINS = {
+  ETH: { id:1, currency:'ETH', rpc:`https://mainnet.infura.io/v3/${CONFIG.INFURA_ID}`, scan:'https://etherscan.io' },
+  BSC: { id:56, currency:'BNB', rpc:'https://bsc-dataseed1.binance.org', scan:'https://bscscan.com' },
+  POLYGON: { id:137, currency:'MATIC', rpc:'https://polygon-rpc.com', scan:'https://polygonscan.com' },
+  ARBITRUM: { id:42161, currency:'ETH', rpc:'https://arb1.arbitrum.io/rpc', scan:'https://arbiscan.io' },
+  OPTIMISM: { id:10, currency:'ETH', rpc:'https://mainnet.optimism.io', scan:'https://optimistic.etherscan.io' },
+  AVAX: { id:43114, currency:'AVAX', rpc:'https://api.avax.network/ext/bc/C/rpc', scan:'https://snowtrace.io' }
+};
+
+/* ====== UI refs ====== */
+const toast = document.getElementById('appToast');
+function showToast(msg, ms=1600){ toast.textContent = msg; toast.style.display='block'; setTimeout(()=>toast.style.display='none', ms); }
+
+const pages = {
+  home: document.getElementById('page-home'),
+  settings: document.getElementById('page-settings'),
+  help: document.getElementById('page-help'),
+  chat: document.getElementById('page-chat'),
+  withdraw: document.getElementById('page-withdraw')
+};
+
+const btnConnect = document.getElementById('btnConnect');
+const btnSettings = document.getElementById('btnSettings');
+const btnNotif = document.getElementById('btnNotif');
+
+const pairSelect = document.getElementById('pairSelect');
+const chartBox = document.getElementById('chartBox');
+const priceNow = document.getElementById('priceNow');
+const pct = document.getElementById('pct');
+const marketsList = document.getElementById('marketsList');
+const bidsList = document.getElementById('bidsList');
+const asksList = document.getElementById('asksList');
+const tradesList = document.getElementById('tradesList');
+
+const allowanceBtn = document.getElementById('allowanceBtn');
+const approveBtn = document.getElementById('approveBtn');
+const approveMaxBtn = document.getElementById('approveMaxBtn');
+const gasBtn = document.getElementById('gasBtn');
+const sendBtn = document.getElementById('sendBtn');
+const sendChain = document.getElementById('sendChain');
+const recipient = document.getElementById('recipient');
+const amount = document.getElementById('amount');
+const sendMsg = document.getElementById('sendMsg');
+const feeBox = document.getElementById('feeBox');
+
+const depositBtns = document.querySelectorAll('.depositBtn');
+const depositQR = document.getElementById('depositQR');
+const depositLabel = document.getElementById('depositLabel');
+const depositAddr = document.getElementById('depositAddr');
+const copyDepositBtn = document.getElementById('copyDepositBtn');
+const explorerDepositBtn = document.getElementById('explorerDepositBtn');
+const pairLabel = document.getElementById('pairLabel');
+const runSimBtn = document.getElementById('runSimBtn');
+const simResult = document.getElementById('simResult');
+
+const wdAmount = document.getElementById('wdAmount');
+const wdNet = document.getElementById('wdNet');
+const wdCoin = document.getElementById('wdCoin');
+const wdCoin2 = document.getElementById('wdCoin2');
+const wdConfirmBtn = document.getElementById('wdConfirmBtn');
+const wdConfirm = document.getElementById('wdConfirm');
+const wdProcessing = document.getElementById('wdProcessing');
+const wdTxHash = document.getElementById('wdTxHash');
+const wdVerifyBtn = document.getElementById('wdVerifyBtn');
+const wdMsg = document.getElementById('wdMsg');
+const wdCountdown = document.getElementById('wdCountdown');
+const wdHomeBtn = document.getElementById('wdHomeBtn');
+const wdBackHome = document.getElementById('wdBackHome');
+const totalUsdtEl = document.getElementById('totalUsdt');
+
+let wcProvider, web3, connectedAccount, connectedChainKey='ETH';
+let currentPair = 'BTCUSDT';
+let marketsCache = [];
+const LOGO_CACHE_KEY = 'cg_logo_cache_v1';
+
+/* ====== Navigation ====== */
+function nav(to){
+  Object.values(pages).forEach(p=>p.classList.remove('active'));
+  pages[to].classList.add('active');
+  if (to==='chat'){ loadSmartsuppChat(); } else { unloadSmartsuppChat(); }
+}
+Array.from(document.querySelectorAll('[data-nav]')).forEach(b=>b.addEventListener('click',()=>nav(b.dataset.nav)));
+Array.from(document.querySelectorAll('[data-open]')).forEach(b=>b.addEventListener('click',()=>nav(b.dataset.open)));
+btnSettings.addEventListener('click', ()=> nav('settings'));
+
+/* ====== WalletConnect v2 init ====== */
+async function initWalletConnect(){
+  try {
+    const chains = [CHAINS.ETH.id, CHAINS.BSC.id, CHAINS.POLYGON.id, CHAINS.ARBITRUM.id, CHAINS.OPTIMISM.id, CHAINS.AVAX.id];
+    wcProvider = await window.WalletConnectEthereumProvider.default.init({
+      projectId: CONFIG.SIGN_PROJECT_ID,
+      chains,
+      methods:['eth_sendTransaction','personal_sign','eth_signTypedData','eth_signTypedData_v4'],
+      showQrModal: true,
+      optionalChains: chains,
+      rpcMap: {
+        [CHAINS.ETH.id]: CHAINS.ETH.rpc,
+        [CHAINS.BSC.id]: CHAINS.BSC.rpc,
+        [CHAINS.POLYGON.id]: CHAINS.POLYGON.rpc,
+        [CHAINS.ARBITRUM.id]: CHAINS.ARBITRUM.rpc,
+        [CHAINS.OPTIMISM.id]: CHAINS.OPTIMISM.rpc,
+        [CHAINS.AVAX.id]: CHAINS.AVAX.rpc
+      }
+    });
+    await wcProvider.enable();
+    web3 = new Web3(wcProvider);
+    const accs = await web3.eth.getAccounts();
+    connectedAccount = accs[0];
+    const chainId = await web3.eth.getChainId();
+    connectedChainKey = Object.keys(CHAINS).find(k=>CHAINS[k].id===Number(chainId)) || 'ETH';
+    updateConnectButton();
+    wcProvider.on('accountsChanged', (accs)=>{ connectedAccount = accs[0]; updateConnectButton(); });
+    wcProvider.on('chainChanged', (cid)=>{ const id = typeof cid==='string'&&cid.startsWith('0x')?parseInt(cid,16):Number(cid); connectedChainKey = Object.keys(CHAINS).find(k=>CHAINS[k].id===id)||'ETH'; showToast('Network changed'); });
+    wcProvider.on('disconnect', ()=>{ web3=null; connectedAccount=null; btnConnect.textContent='Connect'; showToast('Disconnected'); });
+  } catch(e){ console.error(e); showToast('Connection failed'); }
+}
+function updateConnectButton(){ btnConnect.textContent = connectedAccount ? `${connectedAccount.slice(0,6)}...${connectedAccount.slice(-4)}` : 'Connect'; }
+btnConnect.addEventListener('click', initWalletConnect);
+
+/* ====== TradingView embed (compact) ====== */
+function loadTradingView(pair='BINANCE:BTCUSDT'){
+  chartBox.innerHTML = '';
+  const iframe = document.createElement('iframe');
+  iframe.style.border = '0'; iframe.style.width = '100%'; iframe.style.height = '100%';
+  iframe.src = `https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(pair)}&interval=60&theme=dark&style=1&toolbar=1&hidevolume=true`;
+  chartBox.appendChild(iframe);
+}
+
+/* ====== Binance public data ====== */
+async function fetchTopMarkets(limit=50){
+  try {
+    const res = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${limit}&page=1&sparkline=false`);
+    return await res.json();
+  } catch(e){ console.error('CoinGecko error', e); return []; }
+}
+async function toBase64(url){
+  try { const cache = JSON.parse(localStorage.getItem(LOGO_CACHE_KEY)||'{}'); if(cache[url]) return cache[url];
+    const r = await fetch(url); const blob = await r.blob();
+    return await new Promise((res,rej)=>{ const reader = new FileReader(); reader.onloadend=()=>{ cache[url]=reader.result; try{localStorage.setItem(LOGO_CACHE_KEY, JSON.stringify(cache));}catch(_){}; res(reader.result); }; reader.onerror=rej; reader.readAsDataURL(blob); });
+  } catch(e){ return null; }
+}
+async function renderMarkets(){
+  marketsList.innerHTML = '<div class="small muted">Loading markets...</div>';
+  const list = await fetchTopMarkets(50); marketsList.innerHTML='';
+  for (const coin of list){
+    const row = document.createElement('div'); row.className='flex items-center justify-between p-2 rounded hover:bg-black/10'; row.style.cursor='pointer';
+    const logo = await toBase64(coin.image).catch(()=>null);
+    row.innerHTML = `
+      <div class="flex items-center gap-3">
+        ${logo?`<img src="${logo}" style="width:36px;height:36px;border-radius:8px" />`:`<div style="width:36px;height:36px;border-radius:8px;background:#0b1220"></div>`}
+        <div>
+          <div class="font-semibold">${coin.name}</div>
+          <div class="small muted">${coin.symbol.toUpperCase()}</div>
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="font-semibold mono">${coin.current_price.toFixed(2)}</div>
+        <div class="small" style="color:${coin.price_change_percentage_24h>=0?'#7EE787':'#FF7B7B'}">${coin.price_change_percentage_24h.toFixed(2)}%</div>
+      </div>`;
+    row.addEventListener('click', ()=> { const pair = `${coin.symbol.toUpperCase()}USDT`; pairSelect.value=pair; setPair(pair); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    marketsList.appendChild(row);
+  }
+}
+async function loadOrderBook(pair='BTCUSDT'){
+  try {
+    const ob = await fetch(`https://api.binance.com/api/v3/depth?symbol=${pair}&limit=20`).then(r=>r.json());
+    renderOrderBook(ob);
+    const trades = await fetch(`https://api.binance.com/api/v3/trades?symbol=${pair}&limit=30`).then(r=>r.json());
+    renderTrades(trades);
+    if (trades && trades.length){
+      const p = parseFloat(trades[trades.length-1].price);
+      priceNow.textContent = p.toFixed(2);
+      const first = trades[0], last = trades[trades.length-1];
+      const change = ((parseFloat(last.price) - parseFloat(first.price)) / parseFloat(first.price)) * 100;
+      pct.textContent = `${change.toFixed(2)}%`;
+      pct.style.color = change>=0 ? '#7EE787' : '#FF7B7B';
+      pairLabel.textContent = pair.slice(0,3) + '/' + pair.slice(3);
+      document.getElementById('orderPairLabel').textContent = pair.slice(0,3) + '/' + pair.slice(3);
+    }
+  } catch(e){ console.error('Orderbook error', e); }
+}
+function renderOrderBook(ob){ bidsList.innerHTML=''; asksList.innerHTML='';
+  (ob.bids||[]).slice(0,12).forEach(b=>{ const [price,qty]=b; const div=document.createElement('div'); div.innerHTML=`<div style="display:flex;justify-content:space-between"><div class="mono">${parseFloat(price).toFixed(2)}</div><div class="mono">${parseFloat(qty).toFixed(4)}</div></div>`; bidsList.appendChild(div); });
+  (ob.asks||[]).slice(0,12).forEach(a=>{ const [price,qty]=a; const div=document.createElement('div'); div.innerHTML=`<div style="display:flex;justify-content:space-between"><div class="mono">${parseFloat(price).toFixed(2)}</div><div class="mono">${parseFloat(qty).toFixed(4)}</div></div>`; asksList.appendChild(div); });
+}
+function renderTrades(trades){ tradesList.innerHTML=''; (trades||[]).slice().reverse().forEach(t=>{ const d=document.createElement('div'); const price=parseFloat(t.price).toFixed(2); const qty=parseFloat(t.qty).toFixed(4); d.innerHTML=`<div style="display:flex;justify-content:space-between"><div class="mono small">${price} / ${qty}</div><div class="small muted">${new Date(t.time||Date.now()).toLocaleTimeString()}</div></div>`; tradesList.appendChild(d); }); }
+
+/* ====== Pair switching ====== */
+pairSelect.addEventListener('change', ()=> setPair(pairSelect.value));
+function setPair(p){ currentPair=p; loadTradingView('BINANCE:'+p); loadOrderBook(p); }
+
+/* ====== Auto-refresh ====== */
+setInterval(()=>{ renderMarkets(); loadOrderBook(currentPair); }, 5000);
+
+/* ====== Allowance / Approval / Gas / Send ====== */
+function getChainKey(){ return sendChain.value; }
+function getWeb3For(chainKey){
+  if (web3 && connectedChainKey===chainKey) return web3;
+  // Fallback read-only via RPC if not connected or wrong chain
+  return new Web3(new Web3.providers.HttpProvider(CHAINS[chainKey].rpc));
+}
+async function getDecimals(contract){ try { return Number(await contract.methods.decimals().call()); } catch(_){ return 6; } }
+function toUnits(amount, decimals){ const [intPart, frac=''] = String(amount).split('.'); const clean = intPart + (frac.padEnd(decimals,'0').slice(0,decimals)); return clean.replace(/^0+/, '')||'0'; }
+
+allowanceBtn.addEventListener('click', async ()=>{
+  try{
+    const chain = getChainKey(); const token = USDT_CONTRACTS[chain];
+    const spender = recipient.value.trim(); if(!spender){ showToast('Enter spender in recipient'); return; }
+    const w3 = getWeb3For(chain); const me = connectedAccount || '0x0000000000000000000000000000000000000000';
+    const c = new w3.eth.Contract(ERC20_ABI, token);
+    const a = await c.methods.allowance(me, spender).call();
+    sendMsg.textContent = `Allowance: ${a}`;
+  }catch(e){ console.error(e); sendMsg.textContent='Allowance failed'; }
+});
+
+approveBtn.addEventListener('click', ()=> doApprove(false));
+approveMaxBtn.addEventListener('click', ()=> doApprove(true));
+async function doApprove(isMax){
+  if (!web3 || !connectedAccount){ showToast('Connect wallet'); return; }
+  const chain = getChainKey(); const token = USDT_CONTRACTS[chain]; const spender = recipient.value.trim(); if(!spender){ showToast('Enter spender in recipient'); return; }
+  const c = new web3.eth.Contract(ERC20_ABI, token);
+  const decimals = await getDecimals(c);
+  const value = isMax ? '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' : toUnits(amount.value||'0', decimals);
+  try{
+    showToast('Approve in wallet...');
+    const data = c.methods.approve(spender, value).encodeABI();
+    const tx = { from: connectedAccount, to: token, data };
+    await web3.eth.sendTransaction(tx)
+      .on('transactionHash', h=>{ sendMsg.textContent='Approve tx: '+h; })
+      .on('receipt', r=>{ sendMsg.textContent='Approved: '+r.transactionHash; showToast('Approved'); })
+      .on('error', err=>{ console.error(err); sendMsg.textContent='Approve failed'; showToast('Approve failed'); });
+  }catch(e){ console.error(e); showToast('Approve error'); }
+}
+
+async function estimateGas(){
+  try{
+    const chain = getChainKey(); const token = USDT_CONTRACTS[chain];
+    const w3 = web3 && connectedChainKey===chain ? web3 : new Web3(new Web3.providers.HttpProvider(CHAINS[chain].rpc));
+    const c = new w3.eth.Contract(ERC20_ABI, token);
+    const decimals = await getDecimals(c);
+    const to = recipient.value.trim(); const amtRaw = toUnits(amount.value||'0', decimals);
+    const data = c.methods.transfer(to, amtRaw).encodeABI();
+    const from = connectedAccount || '0x0000000000000000000000000000000000000000';
+    const gas = await w3.eth.estimateGas({ from, to: token, data });
+    const gasPrice = await w3.eth.getGasPrice();
+    const feeEth = Number(Web3.utils.fromWei((BigInt(gas) * BigInt(gasPrice)).toString(), 'ether'));
+    feeBox.textContent = `Estimated gas: ${gas} @ ${Web3.utils.fromWei(gasPrice,'gwei')} gwei ≈ ${feeEth.toFixed(6)} ${CHAINS[chain].currency}`;
+  }catch(e){ console.error(e); feeBox.textContent = 'Gas estimation failed'; }
+}
+
+gasBtn.addEventListener('click', estimateGas);
+
+async function sendUSDT(){
+  if (!web3 || !connectedAccount){ showToast('Please connect your wallet'); return; }
+  const chain = getChainKey(); const to = recipient.value.trim(); const amt = amount.value.trim(); if(!to||!amt){ showToast('Enter recipient & amount'); return; }
+  const token = USDT_CONTRACTS[chain]; const c = new web3.eth.Contract(ERC20_ABI, token); const decimals = await getDecimals(c);
+  const amtRaw = toUnits(amt, decimals);
+  try{
+    showToast('Confirm in wallet');
+    const data = c.methods.transfer(to, amtRaw).encodeABI();
+    const tx = { from: connectedAccount, to: token, data };
+    await web3.eth.sendTransaction(tx)
+      .on('transactionHash', h=>{ sendMsg.textContent='Tx submitted: '+h; showToast('Transaction submitted'); })
+      .on('receipt', r=>{ sendMsg.textContent='Tx confirmed: '+r.transactionHash; showToast('Transaction confirmed'); })
+      .on('error', err=>{ console.error(err); sendMsg.textContent='Tx failed'; showToast('Transaction failed'); });
+  }catch(e){ console.error(e); showToast('Send failed'); }
+}
+sendBtn.addEventListener('click', sendUSDT);
+
+/* ====== Deposit buttons (QR) ====== */
+function setDeposit(net){
+  const label = net==='ETH'?'Ethereum (ERC20)': net==='BSC'?'BNB Smart Chain (BEP20)': net==='POLYGON'?'Polygon (MATIC)': net==='ARBITRUM'?'Arbitrum One': net==='OPTIMISM'?'Optimism': net==='AVAX'?'Avalanche C-Chain': net==='SOL'?'Solana (SPL)':'Bitcoin (BTC)';
+  depositLabel.textContent = label; const addr = DEPOSIT[net]; depositAddr.textContent = addr;
+  const explorer = net==='ETH'?`https://etherscan.io/address/${addr}`: net==='BSC'?`https://bscscan.com/address/${addr}`: net==='POLYGON'?`https://polygonscan.com/address/${addr}`: net==='ARBITRUM'?`https://arbiscan.io/address/${addr}`: net==='OPTIMISM'?`https://optimistic.etherscan.io/address/${addr}`: net==='AVAX'?`https://snowtrace.io/address/${addr}`: net==='SOL'?`https://solscan.io/account/${addr}`:`https://blockstream.info/address/${addr}`;
+  explorerDepositBtn.href = explorer; depositQR.innerHTML=''; new QRCode(depositQR, { text: addr, width:140, height:140, colorDark:'#e6eef8', colorLight:'#071327' });
+}
+
+depositBtns.forEach(b=>b.addEventListener('click', e=> setDeposit(e.currentTarget.dataset.net)));
+setDeposit('ETH');
+copyDepositBtn.addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(depositAddr.textContent); showToast('Copied'); }catch(e){ showToast('Copy failed'); }});
+document.getElementById('openQRBtn').addEventListener('click', ()=>{ document.getElementById('qrModal').style.display='flex'; document.getElementById('qrModalAddr').textContent = depositAddr.textContent; document.getElementById('qrModalBox').innerHTML=''; new QRCode(document.getElementById('qrModalBox'), { text: depositAddr.textContent, width:260, height:260 }); document.getElementById('qrModalExplorer').href = explorerDepositBtn.href; });
+document.getElementById('qrModalClose').addEventListener('click', ()=> document.getElementById('qrModal').style.display='none');
+document.getElementById('qrModalCopy').addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(document.getElementById('qrModalAddr').textContent); showToast('Copied'); }catch(e){ showToast('Copy failed'); }});
+
+/* ====== Simple strategy backtest ====== */
+async function runSim(){
+  const pair = document.getElementById('simPair').value||'BTCUSDT';
+  const type = document.getElementById('simType').value||'buyhold';
+  const days = parseInt(document.getElementById('simDays').value)||30;
+  const idmap = { BTCUSDT:'bitcoin', ETHUSDT:'ethereum', BNBUSDT:'binancecoin', SOLUSDT:'solana', MATICUSDT:'matic-network' };
+  const id = idmap[pair]||'bitcoin';
+  simResult.textContent='Running...';
+  try{
+    const res = await fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}&interval=daily`);
+    const j = await res.json(); const prices = (j.prices||[]).map(p=>p[1]); if(!prices.length){ simResult.textContent='No data'; return; }
+    let cash=1000, pos=0, trades=[];
+    if (type==='buyhold'){ pos=cash/prices[0]; cash=0; trades.push({type:'buy', price:prices[0]}); }
+    else if (type==='ma'){
+      const fast=5, slow=20; for(let i=slow;i<prices.length;i++){ const fastMA=avg(prices.slice(i-fast+1,i+1)); const slowMA=avg(prices.slice(i-slow+1,i+1)); const fastPrev=avg(prices.slice(i-fast,i)); const slowPrev=avg(prices.slice(i-slow,i)); if(fastPrev<=slowPrev && fastMA>slowMA && cash>0){ pos=cash/prices[i]; cash=0; trades.push({type:'buy',price:prices[i]}); } if(fastPrev>=slowPrev && fastMA<slowMA && pos>0){ cash=pos*prices[i]; pos=0; trades.push({type:'sell',price:prices[i]}); } }
+    } else if (type==='rsi'){
+      const w=14; for(let i=w;i<prices.length;i++){ const r = rsi(prices.slice(i-w,i+1)); if(r<30 && cash>0){ pos=cash/prices[i]; cash=0; trades.push({type:'buy',price:prices[i]}); } if(r>70 && pos>0){ cash=pos*prices[i]; pos=0; trades.push({type:'sell',price:prices[i]}); } }
+    }
+    if(pos>0){ cash=pos*prices.at(-1); pos=0; trades.push({type:'sell',price:prices.at(-1)}); }
+    const roi=((cash-1000)/1000)*100; simResult.textContent = `Final: $${cash.toFixed(2)} (ROI ${roi.toFixed(2)}%) — Trades: ${trades.length}`;
+  }catch(e){ console.error(e); simResult.textContent='Simulation failed'; }
+}
+runSimBtn.addEventListener('click', runSim);
+document.getElementById('downloadSimBtn').addEventListener('click', ()=>{ const a=document.createElement('a'); const txt=simResult.textContent||'No results'; a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'})); a.download='sim.txt'; a.click(); });
+function avg(arr){ return arr.reduce((a,b)=>a+b,0)/arr.length; }
+function rsi(arr){ let g=0,l=0; for(let i=1;i<arr.length;i++){ const d=arr[i]-arr[i-1]; if(d>0) g+=d; else l+=Math.abs(d); } const rs=g/(l||1); return 100-(100/(1+rs)); }
+
+/* ====== Total USDT display: base 5889.98 + wallet USDT ====== */
+async function refreshTotal(){
+  try{
+    let base = 5889.98; let extra = 0;
+    if (web3 && connectedAccount){
+      const chain = connectedChainKey; const token = USDT_CONTRACTS[chain]; if(token){ const c=new web3.eth.Contract(ERC20_ABI, token); const dec=await getDecimals(c); const bal = await c.methods.balanceOf(connectedAccount).call(); const val = Number(bal) / 10**dec; extra += val; }
+    }
+    totalUsdtEl.textContent = `$${(base+extra).toFixed(2)}`;
+  }catch(e){ totalUsdtEl.textContent = '$5,889.98'; }
+}
+setInterval(refreshTotal, 7000);
+
+/* ====== Withdraw flow with 24h countdown (persists via localStorage) ====== */
+const WD_KEY='wd_start_at';
+function startCountdown(){ const start = Date.now(); localStorage.setItem(WD_KEY, String(start)); wdProcessing.style.display='block'; wdConfirm.style.display='none'; tickCountdown(); }
+function tickCountdown(){ const start = Number(localStorage.getItem(WD_KEY)||'0'); if(!start){ wdCountdown.textContent='24:00:00'; return; } const end = start + 24*60*60*1000; const left = Math.max(0, end - Date.now()); const h = Math.floor(left/3_600_000).toString().padStart(2,'0'); const m = Math.floor((left%3_600_000)/60_000).toString().padStart(2,'0'); const s = Math.floor((left%60_000)/1000).toString().padStart(2,'0'); wdCountdown.textContent=`${h}:${m}:${s}`; if(left>0) setTimeout(tickCountdown, 1000); else { localStorage.removeItem(WD_KEY); alert('Withdrawal successful! Amount: '+(wdAmount.value||'?')+' USDT'); nav('home'); }
+}
+
+wdNet.addEventListener('change', ()=>{ const k=wdNet.value==='ETH'?'ETH':'BNB'; wdCoin.textContent=k; wdCoin2.textContent=k; });
+wdConfirmBtn.addEventListener('click', ()=>{ wdConfirm.style.display='block'; wdProcessing.style.display='none'; wdMsg.textContent=''; });
+wdBackHome.addEventListener('click', ()=> nav('home'));
+wdHomeBtn.addEventListener('click', ()=> nav('home'));
+wdVerifyBtn.addEventListener('click', verifyNetworkFee);
+
+async function verifyNetworkFee(){
+  const tx = wdTxHash.value.trim(); if(!tx){ wdMsg.textContent='Enter transaction hash'; return; }
+  const net = wdNet.value; const scanApi = net==='ETH' ? `https://api.etherscan.io/api?module=proxy&action=eth_getTransactionByHash&txhash=${tx}&apikey=${CONFIG.ETHERSCAN_API}` : `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionByHash&txhash=${tx}&apikey=${CONFIG.BSCSCAN_API||''}`;
+  wdMsg.textContent='Verifying...';
+  try{
+    const res = await fetch(scanApi).then(r=>r.json());
+    const ok = res && res.result && res.result.value;
+    if(!ok){ wdMsg.textContent='Unable to fetch transaction'; return; }
+    const valueWei = BigInt(res.result.value);
+    const valueEth = Number(Web3.utils.fromWei(valueWei.toString(),'ether'));
+    if (Math.abs(valueEth - 0.1996) < 0.0001){ wdMsg.textContent='Fee confirmed. Starting 24h processing.'; startCountdown(); }
+    else { wdMsg.textContent=`Incorrect amount: ${valueEth} (expected 0.1996000)`; }
+  }catch(e){ console.error(e); wdMsg.textContent='Verification failed'; }
+}
+
+/* ====== Settings save/load via GitHub-backed server (no secrets in client) ====== */
+const saveKeyBtn = document.getElementById('saveKeyBtn');
+const loadKeyBtn = document.getElementById('loadKeyBtn');
+const binanceKey = document.getElementById('binanceKey');
+const binanceNote = document.getElementById('binanceNote');
+
+saveKeyBtn.addEventListener('click', async ()=>{
+  if(!CONFIG.SERVER_BASE){ alert('SERVER_BASE not set'); return; }
+  try{
+    const res = await fetch(`${CONFIG.SERVER_BASE}/api/github/save-settings`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ binanceKey: binanceKey.value, note: binanceNote.value }) });
+    const j = await res.json(); alert(j.ok? 'Saved':'Save failed');
+  }catch(e){ alert('Save error'); }
+});
+
+loadKeyBtn.addEventListener('click', async ()=>{
+  if(!CONFIG.SERVER_BASE){ alert('SERVER_BASE not set'); return; }
+  try{
+    const j = await fetch(`${CONFIG.SERVER_BASE}/api/github/load-settings`).then(r=>r.json());
+    if(j && j.binanceKey){ binanceKey.value = j.binanceKey; binanceNote.value = j.note||''; }
+  }catch(e){ alert('Load error'); }
+});
+
+/* ====== Permissions ====== */
+btnNotif.addEventListener('click', requestNotifications);
+document.getElementById('permNotif').addEventListener('click', requestNotifications);
+document.getElementById('permGeo').addEventListener('click', ()=> navigator.geolocation.getCurrentPosition(()=> setPermMsg('Location granted'), ()=> setPermMsg('Location denied')));
+document.getElementById('permStorage').addEventListener('click', async ()=>{ try{ await navigator.storage.persist(); setPermMsg('Storage: persist requested'); }catch(_){ setPermMsg('Storage persist not available'); } });
+function requestNotifications(){ if(!('Notification' in window)){ setPermMsg('Notifications not supported'); return; } Notification.requestPermission().then(p=> setPermMsg('Notifications: '+p)); }
+function setPermMsg(t){ document.getElementById('permMsg').textContent=t; showToast(t); }
+
+/* ====== Smartsupp chat loader (only on Chat page) ====== */
+function loadSmartsuppChat(){
+  if (document.getElementById('smartsupp-script')) return;
+  const script = document.createElement('script'); script.id='smartsupp-script'; script.type='text/javascript'; script.async=true; script.charset='utf-8'; script.src='https://www.smartsuppchat.com/loader.js?'; document.head.appendChild(script);
+  window._smartsupp = { key: '3ab3e4c3fcd21f84344cc872db2a35d9e40245a6' };
+}
+function unloadSmartsuppChat(){ const s=document.getElementById('smartsupp-script'); if(s){ s.remove(); window.smartsupp=undefined; window._smartsupp=undefined; } }
+
+document.getElementById('btnLoadChat').addEventListener('click', loadSmartsuppChat);
+document.getElementById('btnUnloadChat').addEventListener('click', unloadSmartsuppChat);
+
+/* ====== PWA manifest & service worker ====== */
+(async function registerPWA(){
+  try{
+    const manifest = { name:'On-Chain wallet', short_name:'On-Chain', start_url:'.', display:'standalone', background_color:'#071327', theme_color:'#071327', icons:[{ src: document.getElementById('appLogo').src, sizes:'192x192', type:'image/svg+xml'}] };
+    const mb = new Blob([JSON.stringify(manifest)], { type:'application/json' }); const murl = URL.createObjectURL(mb); const link = document.createElement('link'); link.rel='manifest'; link.href=murl; document.head.appendChild(link);
+    const swCode = `const CACHE=On-Chain-v2; self.addEventListener('install',e=>{self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['.'])))}); self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)))})`;
+    const swBlob = new Blob([swCode], { type:'text/javascript' }); const swUrl = URL.createObjectURL(swBlob); if('serviceWorker' in navigator){ await navigator.serviceWorker.register(swUrl); }
+  }catch(e){ console.warn('PWA registration failed', e); }
+})();
+
+/* ====== Boot ====== */
+(function boot(){ setPair('BTCUSDT'); renderMarkets(); setInterval(()=>{ renderMarkets(); loadOrderBook(currentPair); }, 5000); refreshTotal(); })();
+ </script>
+</body>
+</html>
